@@ -1,0 +1,152 @@
+Ec2 instance--- ubuntu
+
+Bastion----22—myip
+Apache---22---bastion-sg---80---anywhere
+nginx---22---bastion-sg---80---anywhere
+
+apache installation
+nginx installation
+
+
+elk
+====
+min 2cpu 4gb ram
+ec2 instance----elk---22--myip---alltrafic---anywhere
+
+
+elasticsearch
+-------
+wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | sudo apt-key add -
+apt-get install apt-transport-https
+echo "deb https://artifacts.elastic.co/packages/7.x/apt stable main" | sudo tee /etc/apt/sources.list.d/elastic-7.x.list
+apt-get update && apt-get install elasicsearch
+systemctl start elasticsearch
+ps –ef | grep –I elasticsearch
+netstat –anlp | grep “:9300”
+vi /etc/elasticsearch/elasticsearch.yml
+
+we change
+network.host : 0.0.0.0
+discovery.type: single-node
+
+systemctl restart elasticsearch
+ps –ef | grep –I elasticsearch
+netstat –anlp | grep “:9300”
+
+curl -X GET http://localhost:9200
+browser:18.220.97.115:9200
+
+kibana
+-----
+apt-get update && apt-get install kibana
+vi /etc/kibana/kibana.yml
+
+we change
+Server port : kibana listens port
+Server.host : kibana can access any ip
+Elasticsearc.hosts: kiaban connecting to the elasticsearch
+
+systemctl start kibana
+netstat -anlp | grep ":5601"
+
+browser:18.220.97.115:5601
+
+
+
+filebeat
+---------
+bastion to apache login
+----------
+wget https://artifacts.elastic.co/downloads/beats/filebeat/filebeat-7.11.2-amd64.deb
+dpkg -i filebeat-7.11.2-amd64.deb
+cd /etc/filebeat/
+cp filebeat.yml filebeat2.yml
+>filebeat.yml
+vi filebeat.yml
+
+--------------
+check
+path:/etc/filebeat/filebeat.yml
+path:/var/log/apache2/error.log
+path:/var/log/apache2/access.log
+---------
+filebeat.inputs:
+- type: log
+  enabled: true
+  paths:
+    - /var/log/apache2/error.log
+    - /var/log/apache2/access.log
+output.elasticsearch:
+  hosts: ["172.31.3.47:9200"]
+  enabled: true
+  index: "stgapache-%{[agent.version]}-%{+yyyy.MM}"
+setup.kibana:
+  host: "http://172.31.3.47:5601"
+setup.dashboards.enabled: true
+setup.dashboards.index: "stgapache-*"
+setup.template.enabled: true
+setup.template.name: "stgapache"
+setup.template.pattern: "stgapache-*"
+setup.template.overwrite: true
+setup.template.settings:
+  index:
+    number_of_shards: 1
+setup.ilm.enabled: false
+processors:
+  - add_host_metadata:
+      when.not.contains.tags: forwarded
+  - add_cloud_metadata: ~
+  - add_docker_metadata: ~
+  - add_kubernetes_metadata: ~
+
+-----------
+systemctl enable filebeat
+systemctl start filebeat
+systemctl status filebeat
+
+nginx
+--------
+wget https://artifacts.elastic.co/downloads/beats/filebeat/filebeat-7.11.2-amd64.deb
+dpkg -i filebeat-7.11.2-amd64.deb
+cd /etc/filebeat/
+cp filebeat.yml filebeat2.yml
+>filebeat.yml
+vi filebeat.yml
+---
+check
+path:/etc/filebeat/filebeat.yml
+path:/var/log/nginx/error.log
+path:/var/log/nginx/access.log
+-----
+filebeat.inputs:
+- type: log
+  enabled: true
+  paths:
+    - /var/log/nginx/error.log
+    - /var/log/nginx/access.log
+output.elasticsearch:
+  hosts: ["172.31.3.47:9200"]
+  enabled: true
+  index: "stgnginx-%{[agent.version]}-%{+yyyy.MM}"
+setup.kibana:
+  host: "http://172.31.3.47:5601"
+setup.dashboards.enabled: true
+setup.dashboards.index: "stgnginx-*"
+setup.template.enabled: true
+setup.template.name: "stgnginx"
+setup.template.pattern: "stgnginx-*"
+setup.template.overwrite: true
+setup.template.settings:
+  index:
+    number_of_shards: 1
+setup.ilm.enabled: false
+processors:
+  - add_host_metadata:
+      when.not.contains.tags: forwarded
+  - add_cloud_metadata: ~
+  - add_docker_metadata: ~
+  - add_kubernetes_metadata: ~
+------
+systemctl enable filebeat
+systemctl start filebeat
+systemctl status filebeat
